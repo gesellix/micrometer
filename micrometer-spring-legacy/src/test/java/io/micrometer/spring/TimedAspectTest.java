@@ -44,6 +44,9 @@ public class TimedAspectTest {
     private TimedService service;
 
     @Autowired
+    private TimedInterface implementation;
+
+    @Autowired
     private MeterRegistry registry;
 
     @Test
@@ -82,9 +85,23 @@ public class TimedAspectTest {
         assertThat(myConfig.get().isPublishingHistogram()).as("the metric has a histogram").isTrue();
     }
 
+    @Test
+    public void implementationIsTimed() {
+        implementation.timedInImplementation();
+        assertThat(registry.get("implementation").timer().count()).isEqualTo(1);
+        assertThat(registry.get("implementation").timer().getId().getTag("should.see.me")).isEqualTo("yes");
+    }
+
+    @Test
+    public void interfaceIsTimed() {
+        implementation.timedOnInterface();
+        assertThat(registry.get("interface").timer().count()).isEqualTo(1);
+        assertThat(registry.get("interface").timer().getId().getTag("should.see.me")).isNull();
+    }
+
     @Configuration
     @EnableAspectJAutoProxy
-    @Import(TimedService.class)
+    @Import({TimedService.class, TimedInterfaceImpl.class})
     static class TestAspectConfig {
         @Bean
         public SimpleMeterRegistry simpleMeterRegistry() {
@@ -112,6 +129,29 @@ public class TimedAspectTest {
         @Timed(value = "something", histogram = true)
         public String timeWithHistogram() {
             return "hello histogram";
+        }
+    }
+
+    interface TimedInterface {
+        String timedInImplementation();
+
+        @Timed("interface")
+        String timedOnInterface();
+    }
+
+    @Service
+    static class TimedInterfaceImpl implements TimedInterface {
+
+        @Override
+        @Timed(value = "implementation", extraTags = {"should.see.me", "yes"})
+        public String timedInImplementation() {
+            return "hello implementation";
+        }
+
+        @Override
+        @Timed(value = "interface", extraTags = {"should.see.me", "no"})
+        public String timedOnInterface() {
+            return "hello interface";
         }
     }
 }

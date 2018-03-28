@@ -61,6 +61,12 @@ public class TimedAspect {
     public Object timedMethod(ProceedingJoinPoint pjp) throws Throwable {
         Method method = ((MethodSignature) pjp.getSignature()).getMethod();
         Timed timed = method.getAnnotation(Timed.class);
+        if (timed == null) {
+            method = pjp.getTarget().getClass().getDeclaredMethod(
+                    pjp.getSignature().getName(),
+                    method.getParameterTypes());
+            timed = method.getAnnotation(Timed.class);
+        }
         final String metricName = timed.value().isEmpty() ? DEFAULT_METRIC_NAME : timed.value();
 
         Timer.Sample sample = Timer.start(registry);
